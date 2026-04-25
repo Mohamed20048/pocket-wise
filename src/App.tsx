@@ -8,6 +8,7 @@ import Transactions from "./pages/Transactions.tsx";
 import Budgets from "./pages/Budgets.tsx";
 import Goals from "./pages/Goals.tsx";
 import Settings from "./pages/Settings.tsx";
+import Logout from "./pages/Logout.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/budgets" element={<Budgets />} />
           <Route path="/goals" element={<Goals />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/logout" element={<Logout />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
