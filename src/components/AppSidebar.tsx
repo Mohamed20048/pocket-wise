@@ -1,4 +1,4 @@
-import { LayoutDashboard, Receipt, PieChart, Target, Settings, LogOut, Sprout } from "lucide-react";
+import { LayoutDashboard, Receipt, PieChart, Target, Settings, LogOut, Sprout, User } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar,
@@ -22,6 +22,7 @@ const mainItems = [
 ];
 
 const footerItems = [
+  { title: "Profile", url: "/profile", icon: User },
   { title: "Settings", url: "/settings", icon: Settings },
   { title: "Log out", url: "/logout", icon: LogOut },
 ];
