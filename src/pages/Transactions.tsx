@@ -115,8 +115,10 @@ const Transactions = () => {
               <span className="text-foreground">Transactions</span>
             </div>
             <div className="ml-auto flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="text-muted-foreground">
-                <Bell className="h-4 w-4" />
+              <Button asChild variant="ghost" size="icon" className="text-muted-foreground">
+                <Link to="/notifications" aria-label="Notifications">
+                  <Bell className="h-4 w-4" />
+                </Link>
               </Button>
               <Link to="/profile" aria-label="Open profile" className="h-8 w-8 rounded-full bg-gradient-walnut text-primary-foreground flex items-center justify-center text-xs font-semibold transition hover:ring-2 hover:ring-ring hover:ring-offset-2 hover:ring-offset-background">
                 OS
