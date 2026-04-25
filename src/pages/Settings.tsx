@@ -1,0 +1,565 @@
+import { useState } from "react";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/AppSidebar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
+import {
+  Bell,
+  Search,
+  User,
+  Palette,
+  Shield,
+  CreditCard,
+  Database,
+  Leaf,
+  Mail,
+  Smartphone,
+  Globe,
+  KeyRound,
+  Download,
+  Trash2,
+  Check,
+  Sun,
+  Moon,
+  Sprout,
+} from "lucide-react";
+
+type SectionId = "profile" | "preferences" | "notifications" | "security" | "billing" | "data";
+
+const sections: { id: SectionId; title: string; icon: typeof User; hint: string }[] = [
+  { id: "profile", title: "Profile", icon: User, hint: "Your name & avatar" },
+  { id: "preferences", title: "Preferences", icon: Palette, hint: "Theme, currency, locale" },
+  { id: "notifications", title: "Notifications", icon: Bell, hint: "Gentle nudges" },
+  { id: "security", title: "Security", icon: Shield, hint: "Password & sessions" },
+  { id: "billing", title: "Plan", icon: CreditCard, hint: "Subscription tier" },
+  { id: "data", title: "Data garden", icon: Database, hint: "Export or prune" },
+];
+
+const palettes = [
+  { id: "paper", label: "Paper", swatches: ["#EFE8D8", "#3E342A", "#7AA17C"] },
+  { id: "moss", label: "Moss", swatches: ["#E5E8DA", "#2F3A2A", "#8AA66B"] },
+  { id: "clay", label: "Clay", swatches: ["#F1E2D0", "#5A3A2C", "#C68A5A"] },
+];
+
+const Settings = () => {
+  const [active, setActive] = useState<SectionId>("profile");
+  const [theme, setTheme] = useState<"light" | "dark" | "system">("light");
+  const [palette, setPalette] = useState("paper");
+  const [notif, setNotif] = useState({
+    weekly: true,
+    overspend: true,
+    goals: true,
+    product: false,
+    sms: false,
+  });
+
+  return (
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full bg-background">
+        <AppSidebar />
+
+        <div className="flex flex-1 flex-col">
+          <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b border-border bg-background/85 px-4 backdrop-blur md:px-8">
+            <SidebarTrigger className="text-muted-foreground" />
+            <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Grove</span>
+              <span>/</span>
+              <span className="text-foreground">Settings</span>
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              <div className="hidden md:flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground w-64">
+                <Search className="h-3.5 w-3.5" />
+                <span>Search settings…</span>
+              </div>
+              <Button variant="ghost" size="icon" className="text-muted-foreground">
+                <Bell className="h-4 w-4" />
+              </Button>
+              <div className="h-8 w-8 rounded-full bg-gradient-walnut text-primary-foreground flex items-center justify-center text-xs font-semibold">
+                OS
+              </div>
+            </div>
+          </header>
+
+          <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
+            {/* Heading */}
+            <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                  Tend · Configure
+                </p>
+                <h1 className="mt-2 font-serif text-4xl font-bold tracking-tight text-foreground md:text-[2.6rem]">
+                  Settings
+                </h1>
+                <p className="mt-2 text-sm text-muted-foreground max-w-xl">
+                  Shape Grove Ledger to your rhythm — quiet defaults, mindful nudges, your data on your terms.
+                </p>
+              </div>
+              <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+                <Check className="mr-2 h-4 w-4" />
+                Save changes
+              </Button>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
+              {/* Section nav */}
+              <aside className="lg:sticky lg:top-24 self-start">
+                <nav className="rounded-xl border border-border bg-card p-2 shadow-soft">
+                  {sections.map((s) => {
+                    const isActive = s.id === active;
+                    return (
+                      <button
+                        key={s.id}
+                        onClick={() => setActive(s.id)}
+                        className={`group flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left transition-colors ${
+                          isActive
+                            ? "bg-secondary text-foreground"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        }`}
+                      >
+                        <s.icon className={`mt-0.5 h-4 w-4 shrink-0 ${isActive ? "text-primary" : ""}`} />
+                        <div className="leading-tight">
+                          <p className="text-sm font-medium">{s.title}</p>
+                          <p className="text-[11px] text-muted-foreground">{s.hint}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </nav>
+
+                <div className="mt-4 rounded-xl border border-border bg-gradient-paper p-4 shadow-soft">
+                  <div className="flex items-center gap-2">
+                    <Leaf className="h-4 w-4 text-success" />
+                    <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                      Mindful tip
+                    </p>
+                  </div>
+                  <p className="mt-2 text-sm text-foreground/80 leading-relaxed">
+                    Fewer notifications. Calmer decisions. Choose only what you'll act on.
+                  </p>
+                </div>
+              </aside>
+
+              {/* Section content */}
+              <section className="space-y-6">
+                {active === "profile" && (
+                  <Card title="Profile" subtitle="How you appear inside the grove.">
+                    <div className="flex items-center gap-5">
+                      <div className="relative">
+                        <div className="h-20 w-20 rounded-full bg-gradient-walnut text-primary-foreground font-serif text-2xl font-bold flex items-center justify-center shadow-leaf">
+                          OS
+                        </div>
+                        <button className="absolute -bottom-1 -right-1 rounded-full bg-card border border-border p-1.5 text-muted-foreground hover:text-foreground">
+                          <Sprout className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <div>
+                        <p className="font-serif text-lg font-bold text-foreground">Omar Saad</p>
+                        <p className="text-xs text-muted-foreground">Joined September 2024 · Sapling member</p>
+                        <Button variant="ghost" size="sm" className="mt-2 h-7 px-2 text-xs">
+                          Replace photo
+                        </Button>
+                      </div>
+                    </div>
+
+                    <Separator className="my-6" />
+
+                    <div className="grid gap-5 md:grid-cols-2">
+                      <Field label="Full name">
+                        <Input defaultValue="Omar Mohamed Saad" />
+                      </Field>
+                      <Field label="Display name">
+                        <Input defaultValue="Omar" />
+                      </Field>
+                      <Field label="Email" icon={Mail}>
+                        <Input type="email" defaultValue="omar@grove.app" />
+                      </Field>
+                      <Field label="Timezone" icon={Globe}>
+                        <Input defaultValue="Africa / Cairo (GMT+2)" />
+                      </Field>
+                      <div className="md:col-span-2">
+                        <Field label="Bio">
+                          <Textarea
+                            rows={3}
+                            defaultValue="Final-year informatics student tending a small but steady financial garden."
+                          />
+                        </Field>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+
+                {active === "preferences" && (
+                  <>
+                    <Card title="Appearance" subtitle="Light, dark, or follow your system.">
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        {[
+                          { id: "light", label: "Paper", icon: Sun },
+                          { id: "dark", label: "Walnut", icon: Moon },
+                          { id: "system", label: "Auto", icon: Sprout },
+                        ].map((t) => {
+                          const isActive = theme === t.id;
+                          return (
+                            <button
+                              key={t.id}
+                              onClick={() => setTheme(t.id as typeof theme)}
+                              className={`rounded-lg border p-4 text-left transition-all ${
+                                isActive
+                                  ? "border-primary bg-secondary shadow-soft"
+                                  : "border-border bg-card hover:border-accent"
+                              }`}
+                            >
+                              <t.icon className={`h-5 w-5 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+                              <p className="mt-3 text-sm font-medium text-foreground">{t.label}</p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {t.id === "light" ? "Recycled paper tone" : t.id === "dark" ? "Deep bark, low glare" : "Match device"}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <Separator className="my-6" />
+
+                      <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground mb-3">
+                        Accent palette
+                      </p>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        {palettes.map((p) => {
+                          const isActive = palette === p.id;
+                          return (
+                            <button
+                              key={p.id}
+                              onClick={() => setPalette(p.id)}
+                              className={`rounded-lg border p-3 text-left transition-all ${
+                                isActive ? "border-primary bg-secondary" : "border-border bg-card hover:border-accent"
+                              }`}
+                            >
+                              <div className="flex gap-1.5">
+                                {p.swatches.map((c) => (
+                                  <span
+                                    key={c}
+                                    className="h-6 w-6 rounded-full border border-border/50"
+                                    style={{ backgroundColor: c }}
+                                  />
+                                ))}
+                              </div>
+                              <p className="mt-3 text-sm font-medium text-foreground">{p.label}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </Card>
+
+                    <Card title="Currency & format" subtitle="How numbers read in your ledger.">
+                      <div className="grid gap-5 md:grid-cols-2">
+                        <Field label="Primary currency">
+                          <Input defaultValue="EGP — Egyptian Pound" />
+                        </Field>
+                        <Field label="Number format">
+                          <Input defaultValue="1,234.56" />
+                        </Field>
+                        <Field label="Week starts on">
+                          <Input defaultValue="Saturday" />
+                        </Field>
+                        <Field label="Language">
+                          <Input defaultValue="English" />
+                        </Field>
+                      </div>
+                      <Separator className="my-6" />
+                      <ToggleRow
+                        title="Round transactions"
+                        desc="Display amounts rounded to the nearest whole unit."
+                        defaultChecked={false}
+                      />
+                      <ToggleRow
+                        title="Show micro-spending insights"
+                        desc="Surface gentle observations after each week."
+                        defaultChecked
+                      />
+                    </Card>
+                  </>
+                )}
+
+                {active === "notifications" && (
+                  <Card title="Notifications" subtitle="Quiet by default. Opt in only to what helps.">
+                    <div className="space-y-1">
+                      <ToggleRow
+                        title="Weekly garden review"
+                        desc="A short Sunday summary of inflow, outflow, and saplings."
+                        icon={Mail}
+                        checked={notif.weekly}
+                        onChange={(v) => setNotif({ ...notif, weekly: v })}
+                      />
+                      <ToggleRow
+                        title="Envelope overflow"
+                        desc="Nudge me when a budget envelope passes 90%."
+                        icon={Bell}
+                        checked={notif.overspend}
+                        onChange={(v) => setNotif({ ...notif, overspend: v })}
+                      />
+                      <ToggleRow
+                        title="Goal milestones"
+                        desc="Celebrate when a sapling reaches 25%, 50%, or bloom."
+                        icon={Sprout}
+                        checked={notif.goals}
+                        onChange={(v) => setNotif({ ...notif, goals: v })}
+                      />
+                      <ToggleRow
+                        title="Product news"
+                        desc="Occasional notes about new features. Never marketing."
+                        icon={Mail}
+                        checked={notif.product}
+                        onChange={(v) => setNotif({ ...notif, product: v })}
+                      />
+                      <ToggleRow
+                        title="SMS alerts"
+                        desc="Critical alerts only — large or unusual transactions."
+                        icon={Smartphone}
+                        checked={notif.sms}
+                        onChange={(v) => setNotif({ ...notif, sms: v })}
+                      />
+                    </div>
+                  </Card>
+                )}
+
+                {active === "security" && (
+                  <>
+                    <Card title="Password" subtitle="Change it any time. We'll keep recent sessions signed in.">
+                      <div className="grid gap-5 md:grid-cols-2">
+                        <Field label="Current password" icon={KeyRound}>
+                          <Input type="password" placeholder="••••••••" />
+                        </Field>
+                        <div className="hidden md:block" />
+                        <Field label="New password">
+                          <Input type="password" placeholder="At least 10 characters" />
+                        </Field>
+                        <Field label="Confirm new password">
+                          <Input type="password" />
+                        </Field>
+                      </div>
+                      <Button className="mt-5 bg-primary text-primary-foreground hover:bg-primary/90">
+                        Update password
+                      </Button>
+                    </Card>
+
+                    <Card title="Two-factor authentication" subtitle="Add a second layer to your grove.">
+                      <ToggleRow
+                        title="Authenticator app"
+                        desc="Use 1Password, Authy, or Google Authenticator."
+                        defaultChecked
+                      />
+                      <ToggleRow
+                        title="Backup codes"
+                        desc="Generate ten one-time codes to keep offline."
+                        defaultChecked={false}
+                      />
+                    </Card>
+
+                    <Card title="Active sessions" subtitle="Devices currently signed in to your account.">
+                      <div className="divide-y divide-border">
+                        {[
+                          { device: "MacBook Air · Safari", where: "Cairo, EG · current", current: true },
+                          { device: "iPhone 14 · Grove app", where: "Cairo, EG · 2h ago" },
+                          { device: "Chrome · Windows", where: "Alexandria, EG · 4d ago" },
+                        ].map((s) => (
+                          <div key={s.device} className="flex items-center justify-between py-3">
+                            <div>
+                              <p className="text-sm font-medium text-foreground">{s.device}</p>
+                              <p className="text-xs text-muted-foreground">{s.where}</p>
+                            </div>
+                            {s.current ? (
+                              <span className="text-[11px] uppercase tracking-[0.14em] text-success">
+                                This device
+                              </span>
+                            ) : (
+                              <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-destructive">
+                                Sign out
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  </>
+                )}
+
+                {active === "billing" && (
+                  <Card title="Your plan" subtitle="A grove that grows with you.">
+                    <div className="rounded-lg bg-gradient-walnut p-5 text-primary-foreground shadow-leaf">
+                      <p className="text-[11px] uppercase tracking-[0.18em] opacity-70">Current plan</p>
+                      <p className="mt-2 font-serif text-2xl font-bold">Sapling · Free</p>
+                      <p className="mt-1 text-sm opacity-80">
+                        Unlimited transactions, 4 budgets, 2 goals. Perfect to start.
+                      </p>
+                    </div>
+
+                    <Separator className="my-6" />
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {[
+                        {
+                          name: "Sapling",
+                          price: "Free",
+                          features: ["Unlimited transactions", "4 envelopes", "2 goals"],
+                          current: true,
+                        },
+                        {
+                          name: "Grove",
+                          price: "$4 / mo",
+                          features: ["Unlimited everything", "Bank sync", "Reports & exports"],
+                        },
+                      ].map((p) => (
+                        <div
+                          key={p.name}
+                          className={`rounded-lg border p-4 ${
+                            p.current ? "border-primary bg-secondary" : "border-border bg-card"
+                          }`}
+                        >
+                          <div className="flex items-baseline justify-between">
+                            <p className="font-serif text-lg font-bold text-foreground">{p.name}</p>
+                            <p className="text-sm font-medium text-foreground tabular-nums">{p.price}</p>
+                          </div>
+                          <ul className="mt-3 space-y-1.5">
+                            {p.features.map((f) => (
+                              <li key={f} className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Check className="h-3 w-3 text-success" />
+                                {f}
+                              </li>
+                            ))}
+                          </ul>
+                          <Button
+                            variant={p.current ? "ghost" : "default"}
+                            size="sm"
+                            disabled={p.current}
+                            className="mt-4 w-full"
+                          >
+                            {p.current ? "Current plan" : "Upgrade"}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+                {active === "data" && (
+                  <>
+                    <Card title="Export your garden" subtitle="Take your data anywhere — it's always yours.">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <Button variant="outline" className="justify-start h-auto py-3">
+                          <Download className="mr-3 h-4 w-4" />
+                          <div className="text-left">
+                            <p className="text-sm font-medium">CSV export</p>
+                            <p className="text-[11px] text-muted-foreground">All transactions & budgets</p>
+                          </div>
+                        </Button>
+                        <Button variant="outline" className="justify-start h-auto py-3">
+                          <Download className="mr-3 h-4 w-4" />
+                          <div className="text-left">
+                            <p className="text-sm font-medium">JSON archive</p>
+                            <p className="text-[11px] text-muted-foreground">Full account snapshot</p>
+                          </div>
+                        </Button>
+                      </div>
+                    </Card>
+
+                    <Card title="Prune the garden" subtitle="Permanent actions. Take a breath first.">
+                      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                        <div className="flex items-start gap-3">
+                          <Trash2 className="mt-0.5 h-4 w-4 text-destructive" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-foreground">Delete account</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Erase your profile, transactions, budgets, and goals. This cannot be undone.
+                            </p>
+                          </div>
+                          <Button variant="destructive" size="sm">
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  </>
+                )}
+              </section>
+            </div>
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
+  );
+};
+
+/* ---------- helpers ---------- */
+
+const Card = ({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) => (
+  <div className="rounded-xl border border-border bg-card p-6 shadow-soft md:p-7">
+    <div className="mb-5">
+      <h2 className="font-serif text-xl font-bold text-foreground">{title}</h2>
+      {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
+    </div>
+    {children}
+  </div>
+);
+
+const Field = ({
+  label,
+  icon: Icon,
+  children,
+}: {
+  label: string;
+  icon?: typeof Mail;
+  children: React.ReactNode;
+}) => (
+  <div className="space-y-1.5">
+    <Label className="flex items-center gap-1.5 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+      {Icon && <Icon className="h-3 w-3" />}
+      {label}
+    </Label>
+    {children}
+  </div>
+);
+
+const ToggleRow = ({
+  title,
+  desc,
+  icon: Icon,
+  checked,
+  defaultChecked,
+  onChange,
+}: {
+  title: string;
+  desc: string;
+  icon?: typeof Bell;
+  checked?: boolean;
+  defaultChecked?: boolean;
+  onChange?: (v: boolean) => void;
+}) => (
+  <div className="flex items-start justify-between gap-4 py-3 border-b border-border last:border-0">
+    <div className="flex items-start gap-3">
+      {Icon && (
+        <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-md bg-secondary text-muted-foreground">
+          <Icon className="h-4 w-4" />
+        </div>
+      )}
+      <div>
+        <p className="text-sm font-medium text-foreground">{title}</p>
+        <p className="text-xs text-muted-foreground">{desc}</p>
+      </div>
+    </div>
+    <Switch checked={checked} defaultChecked={defaultChecked} onCheckedChange={onChange} />
+  </div>
+);
+
+export default Settings;
