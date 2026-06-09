@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Sprout, ArrowRight, Leaf, Moon, LogIn } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 const Logout = () => {
   const [stage, setStage] = useState<"confirm" | "farewell">("confirm");
@@ -99,7 +100,10 @@ const Logout = () => {
               <div className="mt-7 flex flex-col gap-2.5">
                 <Button
                   className="h-11 bg-primary text-primary-foreground hover:bg-primary/90"
-                  onClick={() => setStage("farewell")}
+                  onClick={async () => {
+                    await supabase.auth.signOut();
+                    setStage("farewell");
+                  }}
                 >
                   Sign me out
                   <ArrowRight className="ml-2 h-4 w-4" />

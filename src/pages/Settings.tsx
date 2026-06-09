@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -8,6 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
+import { Sprout } from "lucide-react";
 import {
   Bell,
   Search,
@@ -58,6 +61,136 @@ const Settings = () => {
     sms: false,
   });
 
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<any>(null);
+  
+  // Profile settings inputs
+  const [fullName, setFullName] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [email, setEmail] = useState("");
+  const [timezone, setTimezone] = useState("");
+  const [bio, setBio] = useState("");
+  
+  // Preference settings inputs
+  const [currency, setCurrency] = useState("EGP");
+  const [numberFormat, setNumberFormat] = useState("1,234.56");
+  const [weekStartsOn, setWeekStartsOn] = useState("Saturday");
+  const [language, setLanguage] = useState("English");
+  const [roundTransactions, setRoundTransactions] = useState(false);
+  const [showMicroInsights, setShowMicroInsights] = useState(true);
+
+  // Security password fields
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [securityLoading, setSecurityLoading] = useState(false);
+
+  useEffect(() => {
+    async function loadSettings() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      setEmail(user.email || "");
+
+      // 1. Load Profile
+      const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      if (prof) {
+        setProfile(prof);
+        setFullName(prof.full_name || "");
+        setDisplayName(prof.display_name || "");
+        setBio(prof.bio || "");
+      }
+
+      // 2. Load Settings
+      const { data: setts } = await supabase.from('settings').select('*').eq('id', user.id).single();
+      if (setts) {
+        setTheme(setts.theme as any);
+        setPalette(setts.palette);
+        setCurrency(setts.currency);
+        setNumberFormat(setts.number_format);
+        setWeekStartsOn(setts.week_starts_on);
+        setLanguage(setts.language);
+        setRoundTransactions(setts.round_transactions);
+        setShowMicroInsights(setts.show_micro_spending_insights);
+        setNotif({
+          weekly: setts.notif_weekly,
+          overspend: setts.notif_overspend,
+          goals: setts.notif_goals,
+          product: setts.notif_product,
+          sms: setts.notif_sms,
+        });
+      }
+      setLoading(false);
+    }
+    loadSettings();
+  }, []);
+
+  const handleSaveAll = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // Update Profile
+    const { error: profError } = await supabase.from('profiles').update({
+      full_name: fullName,
+      display_name: displayName,
+      bio: bio
+    }).eq('id', user.id);
+
+    // Update Settings
+    const { error: settError } = await supabase.from('settings').update({
+      theme: theme,
+      palette: palette,
+      currency: currency,
+      number_format: numberFormat,
+      week_starts_on: weekStartsOn,
+      language: language,
+      round_transactions: roundTransactions,
+      show_micro_spending_insights: showMicroInsights,
+      notif_weekly: notif.weekly,
+      notif_overspend: notif.overspend,
+      notif_goals: notif.goals,
+      notif_product: notif.product,
+      notif_sms: notif.sms
+    }).eq('id', user.id);
+
+    if (profError || settError) {
+      toast.error(profError?.message || settError?.message || "Failed to save settings");
+    } else {
+      toast.success("Settings saved successfully!");
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    if (!newPassword || newPassword !== confirmPassword) {
+      toast.error("Passwords do not match or are empty.");
+      return;
+    }
+    setSecurityLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setSecurityLoading(false);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Password updated successfully!");
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const confirmDelete = window.confirm("Are you absolutely sure you want to delete your account? This will permanently delete your profile, budgets, goals, and transactions. This action CANNOT be undone.");
+    if (!confirmDelete) return;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase.from('profiles').delete().eq('id', user.id);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      await supabase.auth.signOut();
+      toast.success("Account deleted successfully.");
+    }
+  };
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background">
@@ -101,7 +234,7 @@ const Settings = () => {
                   Shape Grove Ledger to your rhythm — quiet defaults, mindful nudges, your data on your terms.
                 </p>
               </div>
-              <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+              <Button onClick={handleSaveAll} className="bg-primary text-primary-foreground hover:bg-primary/90">
                 <Check className="mr-2 h-4 w-4" />
                 Save changes
               </Button>
@@ -172,22 +305,23 @@ const Settings = () => {
 
                     <div className="grid gap-5 md:grid-cols-2">
                       <Field label="Full name">
-                        <Input defaultValue="Omar Mohamed Saad" />
+                        <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
                       </Field>
                       <Field label="Display name">
-                        <Input defaultValue="Omar" />
+                        <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
                       </Field>
                       <Field label="Email" icon={Mail}>
-                        <Input type="email" defaultValue="omar@grove.app" />
+                        <Input type="email" value={email} disabled className="opacity-70 cursor-not-allowed" />
                       </Field>
                       <Field label="Timezone" icon={Globe}>
-                        <Input defaultValue="Africa / Cairo (GMT+2)" />
+                        <Input value={timezone} onChange={(e) => setTimezone(e.target.value)} />
                       </Field>
                       <div className="md:col-span-2">
                         <Field label="Bio">
                           <Textarea
                             rows={3}
-                            defaultValue="Final-year informatics student tending a small but steady financial garden."
+                            value={bio}
+                            onChange={(e) => setBio(e.target.value)}
                           />
                         </Field>
                       </div>
@@ -260,28 +394,30 @@ const Settings = () => {
                     <Card title="Currency & format" subtitle="How numbers read in your ledger.">
                       <div className="grid gap-5 md:grid-cols-2">
                         <Field label="Primary currency">
-                          <Input defaultValue="EGP — Egyptian Pound" />
+                          <Input value={currency} onChange={(e) => setCurrency(e.target.value)} />
                         </Field>
                         <Field label="Number format">
-                          <Input defaultValue="1,234.56" />
+                          <Input value={numberFormat} onChange={(e) => setNumberFormat(e.target.value)} />
                         </Field>
                         <Field label="Week starts on">
-                          <Input defaultValue="Saturday" />
+                          <Input value={weekStartsOn} onChange={(e) => setWeekStartsOn(e.target.value)} />
                         </Field>
                         <Field label="Language">
-                          <Input defaultValue="English" />
+                          <Input value={language} onChange={(e) => setLanguage(e.target.value)} />
                         </Field>
                       </div>
                       <Separator className="my-6" />
                       <ToggleRow
                         title="Round transactions"
                         desc="Display amounts rounded to the nearest whole unit."
-                        defaultChecked={false}
+                        checked={roundTransactions}
+                        onChange={setRoundTransactions}
                       />
                       <ToggleRow
                         title="Show micro-spending insights"
                         desc="Surface gentle observations after each week."
-                        defaultChecked
+                        checked={showMicroInsights}
+                        onChange={setShowMicroInsights}
                       />
                     </Card>
                   </>
@@ -333,19 +469,16 @@ const Settings = () => {
                   <>
                     <Card title="Password" subtitle="Change it any time. We'll keep recent sessions signed in.">
                       <div className="grid gap-5 md:grid-cols-2">
-                        <Field label="Current password" icon={KeyRound}>
-                          <Input type="password" placeholder="••••••••" />
-                        </Field>
                         <div className="hidden md:block" />
                         <Field label="New password">
-                          <Input type="password" placeholder="At least 10 characters" />
+                          <Input type="password" placeholder="At least 6 characters" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
                         </Field>
                         <Field label="Confirm new password">
-                          <Input type="password" />
+                          <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
                         </Field>
                       </div>
-                      <Button className="mt-5 bg-primary text-primary-foreground hover:bg-primary/90">
-                        Update password
+                      <Button onClick={handleUpdatePassword} disabled={securityLoading} className="mt-5 bg-primary text-primary-foreground hover:bg-primary/90">
+                        {securityLoading ? "Updating..." : "Update password"}
                       </Button>
                     </Card>
 
@@ -479,7 +612,7 @@ const Settings = () => {
                               Erase your profile, transactions, budgets, and goals. This cannot be undone.
                             </p>
                           </div>
-                          <Button variant="destructive" size="sm">
+                          <Button variant="destructive" size="sm" onClick={handleDeleteAccount}>
                             Delete
                           </Button>
                         </div>

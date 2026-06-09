@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -11,49 +11,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 import {
-  Bell,
-  Search,
-  Plus,
-  ShoppingBasket,
-  Coffee,
-  Bus,
-  Music,
-  BookOpen,
-  Home,
-  Sparkles,
-  Heart,
-  Sprout,
-  TrendingUp,
-  AlertTriangle,
-  CheckCircle2,
-  type LucideIcon,
-} from "lucide-react";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import * as Lucide from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 
 type Tone = "primary" | "accent" | "warning" | "success" | "muted";
 
-interface Budget {
-  id: string;
-  name: string;
-  category: string;
-  icon: LucideIcon;
-  spent: number;
-  total: number;
-  tone: Tone;
-  rollover?: number;
-}
-
-const BUDGETS: Budget[] = [
-  { id: "b1", name: "Groceries", category: "Food", icon: ShoppingBasket, spent: 350, total: 500, tone: "primary", rollover: 12 },
-  { id: "b2", name: "Cafés & dining", category: "Food", icon: Coffee, spent: 128, total: 150, tone: "warning" },
-  { id: "b3", name: "Transport", category: "Mobility", icon: Bus, spent: 75, total: 120, tone: "accent" },
-  { id: "b4", name: "Entertainment", category: "Leisure", icon: Music, spent: 42, total: 100, tone: "success", rollover: 8 },
-  { id: "b5", name: "Education", category: "Growth", icon: BookOpen, spent: 180, total: 300, tone: "primary" },
-  { id: "b6", name: "Rent & utilities", category: "Home", icon: Home, spent: 620, total: 700, tone: "warning" },
-  { id: "b7", name: "Self-care", category: "Wellness", icon: Heart, spent: 24, total: 80, tone: "success" },
-  { id: "b8", name: "Misc & extras", category: "Other", icon: Sparkles, spent: 95, total: 90, tone: "warning" },
-];
+const iconMap: Record<string, any> = {
+  ShoppingBasket: Lucide.ShoppingBasket,
+  Coffee: Lucide.Coffee,
+  Bus: Lucide.Bus,
+  Music: Lucide.Music,
+  BookOpen: Lucide.BookOpen,
+  Home: Lucide.Home,
+  Heart: Lucide.Heart,
+  Sparkles: Lucide.Sparkles,
+};
 
 const toneBar: Record<Tone, string> = {
   primary: "bg-primary",
@@ -72,40 +55,121 @@ const toneIconBg: Record<Tone, string> = {
 };
 
 function statusOf(spent: number, total: number) {
-  const pct = (spent / total) * 100;
-  if (pct >= 100) return { label: "Over", tone: "warning" as const, icon: AlertTriangle };
-  if (pct >= 85) return { label: "Watch", tone: "warning" as const, icon: AlertTriangle };
-  if (pct >= 50) return { label: "On track", tone: "primary" as const, icon: TrendingUp };
-  return { label: "Healthy", tone: "success" as const, icon: CheckCircle2 };
+  const pct = total > 0 ? (spent / total) * 100 : 0;
+  if (pct >= 100) return { label: "Over", tone: "warning" as const, icon: Lucide.AlertTriangle };
+  if (pct >= 85) return { label: "Watch", tone: "warning" as const, icon: Lucide.AlertTriangle };
+  if (pct >= 50) return { label: "On track", tone: "primary" as const, icon: Lucide.TrendingUp };
+  return { label: "Healthy", tone: "success" as const, icon: Lucide.CheckCircle2 };
 }
 
 const Budgets = () => {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<string>("all");
+  const [budgets, setBudgets] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // New budget dialog states
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState("Food");
+  const [iconKey, setIconKey] = useState("ShoppingBasket");
+  const [totalLimit, setTotalLimit] = useState("");
+  const [budgetTone, setBudgetTone] = useState<Tone>("primary");
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    async function fetchBudgets() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("budgets")
+        .select("*")
+        .eq("user_id", user.id);
+      if (data) {
+        setBudgets(data);
+      }
+      setLoading(false);
+    }
+    fetchBudgets();
+  }, []);
+
+  const handleCreateBudget = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name || !totalLimit) {
+      toast.error("Please fill in budget name and total limit.");
+      return;
+    }
+    setCreating(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("budgets")
+      .insert({
+        user_id: user.id,
+        name,
+        category,
+        icon: iconKey,
+        total: parseFloat(totalLimit),
+        spent: 0.00,
+        tone: budgetTone,
+        rollover: 0.00,
+      })
+      .select()
+      .single();
+
+    setCreating(false);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Envelope planted successfully!");
+      if (data) {
+        setBudgets((prev) => [...prev, data]);
+      }
+      setOpen(false);
+      setName("");
+      setTotalLimit("");
+    }
+  };
 
   const filtered = useMemo(() => {
-    return BUDGETS.filter((b) => {
+    return budgets.filter((b) => {
       const matchQ = `${b.name} ${b.category}`.toLowerCase().includes(query.toLowerCase());
       if (!matchQ) return false;
       if (filter === "all") return true;
-      const pct = (b.spent / b.total) * 100;
+      const pct = b.total > 0 ? (b.spent / b.total) * 100 : 0;
       if (filter === "healthy") return pct < 50;
       if (filter === "ontrack") return pct >= 50 && pct < 85;
       if (filter === "watch") return pct >= 85 && pct < 100;
       if (filter === "over") return pct >= 100;
       return true;
     });
-  }, [query, filter]);
+  }, [budgets, query, filter]);
 
   const totals = useMemo(() => {
-    const totalAllocated = BUDGETS.reduce((s, b) => s + b.total, 0);
-    const totalSpent = BUDGETS.reduce((s, b) => s + b.spent, 0);
+    const totalAllocated = budgets.reduce((s, b) => s + Number(b.total), 0);
+    const totalSpent = budgets.reduce((s, b) => s + Number(b.spent), 0);
     const remaining = totalAllocated - totalSpent;
-    const overCount = BUDGETS.filter((b) => b.spent >= b.total).length;
+    const overCount = budgets.filter((b) => Number(b.spent) >= Number(b.total)).length;
     return { totalAllocated, totalSpent, remaining, overCount };
-  }, []);
+  }, [budgets]);
 
-  const overallPct = Math.min(100, Math.round((totals.totalSpent / totals.totalAllocated) * 100));
+  const overallPct = totals.totalAllocated > 0
+    ? Math.min(100, Math.round((totals.totalSpent / totals.totalAllocated) * 100))
+    : 0;
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center bg-background" style={{ background: "var(--gradient-paper)" }}>
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-secondary">
+            <Lucide.Sprout className="h-7 w-7 text-success animate-pulse" />
+          </div>
+          <p className="font-serif text-lg font-bold text-foreground">Watering the soil…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -122,12 +186,12 @@ const Budgets = () => {
             </div>
             <div className="ml-auto flex items-center gap-2">
               <div className="hidden md:flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground w-64">
-                <Search className="h-3.5 w-3.5" />
+                <Lucide.Search className="h-3.5 w-3.5" />
                 <span>Search budgets…</span>
               </div>
               <Button asChild variant="ghost" size="icon" className="text-muted-foreground">
                 <Link to="/notifications" aria-label="Notifications">
-                  <Bell className="h-4 w-4" />
+                  <Lucide.Bell className="h-4 w-4" />
                 </Link>
               </Button>
               <Link to="/profile" aria-label="Open profile" className="h-8 w-8 rounded-full bg-gradient-walnut text-primary-foreground flex items-center justify-center text-xs font-semibold transition hover:ring-2 hover:ring-ring hover:ring-offset-2 hover:ring-offset-background">
@@ -152,8 +216,8 @@ const Budgets = () => {
                 <Button variant="outline" className="border-border bg-card hover:bg-secondary">
                   Reset month
                 </Button>
-                <Button className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-soft">
-                  <Plus className="mr-1.5 h-4 w-4" /> New budget
+                <Button onClick={() => setOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-soft">
+                  <Lucide.Plus className="mr-1.5 h-4 w-4" /> New budget
                 </Button>
               </div>
             </div>
@@ -192,7 +256,7 @@ const Budgets = () => {
 
               <div className="rounded-xl border border-border bg-gradient-walnut p-6 text-primary-foreground shadow-leaf">
                 <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-primary-foreground/70">
-                  <Sprout className="h-3.5 w-3.5" /> Mindful note
+                  <Lucide.Sprout className="h-3.5 w-3.5" /> Mindful note
                 </div>
                 <p className="mt-3 font-serif text-lg leading-snug">
                   You're {overallPct}% through October's envelope with {totals.overCount} basket{totals.overCount === 1 ? "" : "s"} overflowing.
@@ -214,12 +278,12 @@ const Budgets = () => {
               <div className="flex items-center gap-3">
                 <h2 className="font-serif text-xl font-bold text-foreground">Your envelopes</h2>
                 <span className="rounded-full border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground">
-                  {filtered.length} of {BUDGETS.length}
+                  {filtered.length} of {budgets.length}
                 </span>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Lucide.Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
@@ -245,11 +309,13 @@ const Budgets = () => {
             {/* Budget grid */}
             <section className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
               {filtered.map((b) => {
-                const pct = Math.min(100, Math.round((b.spent / b.total) * 100));
-                const remaining = b.total - b.spent;
-                const status = statusOf(b.spent, b.total);
+                const spentNum = Number(b.spent);
+                const totalNum = Number(b.total);
+                const pct = totalNum > 0 ? Math.min(100, Math.round((spentNum / totalNum) * 100)) : 0;
+                const remaining = totalNum - spentNum;
+                const status = statusOf(spentNum, totalNum);
                 const StatusIcon = status.icon;
-                const Icon = b.icon;
+                const IconComponent = iconMap[b.icon] || Lucide.Sparkles;
                 return (
                   <article
                     key={b.id}
@@ -257,8 +323,8 @@ const Budgets = () => {
                   >
                     <header className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className={cn("flex h-10 w-10 items-center justify-center rounded-md", toneIconBg[b.tone])}>
-                          <Icon className="h-4.5 w-4.5" />
+                        <div className={cn("flex h-10 w-10 items-center justify-center rounded-md", toneIconBg[b.tone as Tone])}>
+                          <IconComponent className="h-4.5 w-4.5" />
                         </div>
                         <div>
                           <h3 className="font-serif text-lg font-bold leading-tight text-foreground">{b.name}</h3>
@@ -280,14 +346,14 @@ const Budgets = () => {
 
                     <div className="mt-5 flex items-baseline justify-between">
                       <p className="font-serif text-2xl font-bold text-foreground tabular-nums">
-                        ${b.spent.toFixed(2)}
+                        ${spentNum.toFixed(2)}
                       </p>
-                      <p className="text-xs text-muted-foreground tabular-nums">/ ${b.total.toFixed(2)}</p>
+                      <p className="text-xs text-muted-foreground tabular-nums">/ ${totalNum.toFixed(2)}</p>
                     </div>
 
                     <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
                       <div
-                        className={cn("h-full rounded-full transition-all", toneBar[b.tone])}
+                        className={cn("h-full rounded-full transition-all", toneBar[b.tone as Tone])}
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -299,10 +365,10 @@ const Budgets = () => {
                       </span>
                     </div>
 
-                    {b.rollover ? (
+                    {b.rollover && Number(b.rollover) > 0 ? (
                       <p className="mt-3 flex items-center gap-1.5 border-t border-border pt-3 text-[11px] text-muted-foreground">
-                        <Sprout className="h-3 w-3 text-success" />
-                        ${b.rollover.toFixed(2)} rolled over from September
+                        <Lucide.Sprout className="h-3 w-3 text-success" />
+                        ${Number(b.rollover).toFixed(2)} rolled over from September
                       </p>
                     ) : null}
                   </article>
@@ -310,9 +376,12 @@ const Budgets = () => {
               })}
 
               {/* Add new envelope tile */}
-              <button className="group flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card/50 p-5 text-muted-foreground transition-all hover:border-primary/50 hover:bg-card hover:text-foreground">
+              <button
+                onClick={() => setOpen(true)}
+                className="group flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card/50 p-5 text-muted-foreground transition-all hover:border-primary/50 hover:bg-card hover:text-foreground"
+              >
                 <div className="flex h-10 w-10 items-center justify-center rounded-md border border-dashed border-border group-hover:border-primary/50">
-                  <Plus className="h-4 w-4" />
+                  <Lucide.Plus className="h-4 w-4" />
                 </div>
                 <p className="font-serif text-sm font-medium">Plant a new envelope</p>
                 <p className="text-[11px] text-muted-foreground/80">Choose a category and seed an amount</p>
@@ -325,6 +394,90 @@ const Budgets = () => {
           </main>
         </div>
       </div>
+
+      {/* New Budget Dialog */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <form onSubmit={handleCreateBudget}>
+            <DialogHeader>
+              <DialogTitle className="font-serif text-2xl">Plant an envelope</DialogTitle>
+              <DialogDescription>
+                Define a new budget envelope. It will help monitor your spending with care.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right text-xs uppercase tracking-wider text-muted-foreground">Name</Label>
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Groceries"
+                  className="col-span-3"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="category" className="text-right text-xs uppercase tracking-wider text-muted-foreground">Category</Label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["Food", "Mobility", "Leisure", "Growth", "Home", "Wellness", "Other"].map((cat) => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="icon" className="text-right text-xs uppercase tracking-wider text-muted-foreground">Icon</Label>
+                <Select value={iconKey} onValueChange={setIconKey}>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Icon" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(iconMap).map((key) => (
+                      <SelectItem key={key} value={key}>{key}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="total" className="text-right text-xs uppercase tracking-wider text-muted-foreground">Limit ($)</Label>
+                <Input
+                  id="total"
+                  type="number"
+                  value={totalLimit}
+                  onChange={(e) => setTotalLimit(e.target.value)}
+                  placeholder="500"
+                  className="col-span-3"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="tone" className="text-right text-xs uppercase tracking-wider text-muted-foreground">Tone Color</Label>
+                <Select value={budgetTone} onValueChange={(v) => setBudgetTone(v as Tone)}>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Color Tone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["primary", "accent", "warning", "success", "muted"].map((t) => (
+                      <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={creating} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                {creating ? "Planting..." : "Plant Envelope"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </SidebarProvider>
   );
 };

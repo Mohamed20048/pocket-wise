@@ -11,6 +11,7 @@ import Settings from "./pages/Settings.tsx";
 import Profile from "./pages/Profile.tsx";
 import Notifications from "./pages/Notifications.tsx";
 import Logout from "./pages/Logout.tsx";
+import AuthWrapper from "./components/AuthWrapper.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -21,18 +22,20 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/transactions" element={<Transactions />} />
-          <Route path="/budgets" element={<Budgets />} />
-          <Route path="/goals" element={<Goals />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/notifications" element={<Notifications />} />
-          <Route path="/logout" element={<Logout />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthWrapper>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/transactions" element={<Transactions />} />
+            <Route path="/budgets" element={<Budgets />} />
+            <Route path="/goals" element={<Goals />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/logout" element={<Logout />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthWrapper>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

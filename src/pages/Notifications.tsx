@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -7,123 +7,24 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import {
-  Bell,
-  BellOff,
-  CheckCheck,
-  Filter,
-  Sprout,
-  Leaf,
-  TrendingDown,
-  TrendingUp,
-  Target,
-  AlertTriangle,
-  Wallet,
-  Users,
-  Settings as SettingsIcon,
-  Trash2,
-  Search,
-} from "lucide-react";
+import * as Lucide from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 
 type Tone = "success" | "warning" | "destructive" | "accent" | "primary";
 type Category = "all" | "saplings" | "budgets" | "transactions" | "system";
 
-interface Notice {
-  id: string;
-  category: Exclude<Category, "all">;
-  icon: typeof Sprout;
-  tone: Tone;
-  title: string;
-  body: string;
-  time: string;
-  read: boolean;
-  pinned?: boolean;
-}
-
-const seed: Notice[] = [
-  {
-    id: "n1",
-    category: "saplings",
-    icon: Sprout,
-    tone: "success",
-    title: "Emergency fund bloomed",
-    body: "Your emergency sapling reached 100% of its $6,000 target. Time to plant the next.",
-    time: "12m ago",
-    read: false,
-    pinned: true,
-  },
-  {
-    id: "n2",
-    category: "budgets",
-    icon: AlertTriangle,
-    tone: "warning",
-    title: "Groceries budget at 86%",
-    body: "$432 of $500 spent this month. 9 days remain before reset.",
-    time: "1h ago",
-    read: false,
-  },
-  {
-    id: "n3",
-    category: "transactions",
-    icon: TrendingDown,
-    tone: "destructive",
-    title: "Unusual outflow detected",
-    body: "$248.00 at Northwind Hardware — larger than your typical spend in this category.",
-    time: "3h ago",
-    read: false,
-  },
-  {
-    id: "n4",
-    category: "transactions",
-    icon: TrendingUp,
-    tone: "success",
-    title: "Payday landed",
-    body: "$3,420.00 from Mossbark Studio cleared and was sorted into your ledger.",
-    time: "Today, 8:02 AM",
-    read: true,
-  },
-  {
-    id: "n5",
-    category: "saplings",
-    icon: Target,
-    tone: "accent",
-    title: "Travel sapling watered",
-    body: "Recurring contribution of $150 added to your Kyoto fund.",
-    time: "Yesterday",
-    read: true,
-  },
-  {
-    id: "n6",
-    category: "budgets",
-    icon: Leaf,
-    tone: "success",
-    title: "Dining within bounds",
-    body: "Closed last week 18% under your dining allowance. Steady hand.",
-    time: "2d ago",
-    read: true,
-  },
-  {
-    id: "n7",
-    category: "system",
-    icon: Users,
-    tone: "primary",
-    title: "New device signed in",
-    body: "iPad · Portland, OR. If this wasn't you, prune the session in Settings.",
-    time: "3d ago",
-    read: true,
-  },
-  {
-    id: "n8",
-    category: "system",
-    icon: Wallet,
-    tone: "primary",
-    title: "Account synced",
-    body: "Mossbark Credit Union finished its weekly reconciliation. 24 new entries.",
-    time: "5d ago",
-    read: true,
-  },
-];
+const iconMap: Record<string, any> = {
+  Sprout: Lucide.Sprout,
+  AlertTriangle: Lucide.AlertTriangle,
+  TrendingDown: Lucide.TrendingDown,
+  TrendingUp: Lucide.TrendingUp,
+  Target: Lucide.Target,
+  Leaf: Lucide.Leaf,
+  Users: Lucide.Users,
+  Wallet: Lucide.Wallet,
+};
 
 const categories: { id: Category; label: string }[] = [
   { id: "all", label: "All" },
@@ -141,11 +42,43 @@ const toneClasses: Record<Tone, string> = {
   primary: "bg-primary/10 text-primary border-primary/20",
 };
 
+const formatNoticeTime = (createdAt: string) => {
+  const diff = Date.now() - new Date(createdAt).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "Yesterday";
+  return new Date(createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
+
 export default function Notifications() {
-  const [items, setItems] = useState<Notice[]>(seed);
+  const [items, setItems] = useState<any[]>([]);
   const [filter, setFilter] = useState<Category>("all");
   const [query, setQuery] = useState("");
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadNotifications() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (data) {
+        setItems(data);
+      }
+      setLoading(false);
+    }
+    loadNotifications();
+  }, []);
 
   const filtered = useMemo(() => {
     return items.filter((n) => {
@@ -160,11 +93,84 @@ export default function Notifications() {
   const pinned = filtered.filter((n) => n.pinned);
   const rest = filtered.filter((n) => !n.pinned);
 
-  const markAllRead = () => setItems((prev) => prev.map((n) => ({ ...n, read: true })));
-  const clearAll = () => setItems([]);
-  const toggleRead = (id: string) =>
-    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: !n.read } : n)));
-  const remove = (id: string) => setItems((prev) => prev.filter((n) => n.id !== id));
+  const markAllRead = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from("notifications")
+      .update({ read: true })
+      .eq("user_id", user.id);
+
+    if (error) {
+      toast.error(error.message);
+    } else {
+      setItems((prev) => prev.map((n) => ({ ...n, read: true })));
+      toast.success("All notifications marked read.");
+    }
+  };
+
+  const clearAll = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from("notifications")
+      .delete()
+      .eq("user_id", user.id);
+
+    if (error) {
+      toast.error(error.message);
+    } else {
+      setItems([]);
+      toast.success("All notifications cleared.");
+    }
+  };
+
+  const toggleRead = async (id: string) => {
+    const item = items.find((n) => n.id === id);
+    if (!item) return;
+
+    const { data, error } = await supabase
+      .from("notifications")
+      .update({ read: !item.read })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      toast.error(error.message);
+    } else if (data) {
+      setItems((prev) => prev.map((n) => (n.id === id ? data : n)));
+    }
+  };
+
+  const remove = async (id: string) => {
+    const { error } = await supabase
+      .from("notifications")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      toast.error(error.message);
+    } else {
+      setItems((prev) => prev.filter((n) => n.id !== id));
+      toast.success("Notification dismissed.");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center bg-background" style={{ background: "var(--gradient-paper)" }}>
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-secondary">
+            <Lucide.Sprout className="h-7 w-7 text-success animate-pulse" />
+          </div>
+          <p className="font-serif text-lg font-bold text-foreground">Listening for whispers…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -181,7 +187,7 @@ export default function Notifications() {
             </div>
             <div className="ml-auto flex items-center gap-2">
               <Button variant="ghost" size="icon" className="text-muted-foreground">
-                <Bell className="h-4 w-4" />
+                <Lucide.Bell className="h-4 w-4" />
               </Button>
               <Link
                 to="/profile"
@@ -214,7 +220,7 @@ export default function Notifications() {
                   onClick={markAllRead}
                   disabled={unreadCount === 0}
                 >
-                  <CheckCheck className="mr-1.5 h-4 w-4" /> Mark all read
+                  <Lucide.CheckCheck className="mr-1.5 h-4 w-4" /> Mark all read
                 </Button>
                 <Button
                   variant="outline"
@@ -222,7 +228,7 @@ export default function Notifications() {
                   onClick={clearAll}
                   disabled={items.length === 0}
                 >
-                  <Trash2 className="mr-1.5 h-4 w-4" /> Clear
+                  <Lucide.Trash2 className="mr-1.5 h-4 w-4" /> Clear
                 </Button>
               </div>
             </div>
@@ -267,7 +273,7 @@ export default function Notifications() {
 
                 <div className="flex items-center gap-3">
                   <div className="relative">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Lucide.Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
@@ -310,7 +316,7 @@ export default function Notifications() {
             >
               <div className="flex items-start gap-3 text-primary-foreground">
                 <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary-foreground/10">
-                  <SettingsIcon className="h-4 w-4" />
+                  <Lucide.Settings className="h-4 w-4" />
                 </div>
                 <div>
                   <p className="font-serif text-base font-bold">Tune the chimes</p>
@@ -352,11 +358,11 @@ function Row({
   onToggle,
   onRemove,
 }: {
-  n: Notice;
+  n: any;
   onToggle: (id: string) => void;
   onRemove: (id: string) => void;
 }) {
-  const Icon = n.icon;
+  const IconComponent = iconMap[n.icon] || Lucide.Bell;
   return (
     <article
       className={cn(
@@ -370,10 +376,10 @@ function Row({
       <div
         className={cn(
           "flex h-9 w-9 shrink-0 items-center justify-center rounded-md border",
-          toneClasses[n.tone],
+          toneClasses[n.tone as Tone],
         )}
       >
-        <Icon className="h-4 w-4" />
+        <IconComponent className="h-4 w-4" />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
@@ -389,7 +395,7 @@ function Row({
             <p className="mt-0.5 text-sm text-muted-foreground">{n.body}</p>
           </div>
           <span className="shrink-0 text-[11px] uppercase tracking-wider text-muted-foreground">
-            {n.time}
+            {formatNoticeTime(n.created_at)}
           </span>
         </div>
         <div className="mt-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
@@ -399,7 +405,7 @@ function Row({
             className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
             onClick={() => onToggle(n.id)}
           >
-            {n.read ? <BellOff className="mr-1 h-3 w-3" /> : <CheckCheck className="mr-1 h-3 w-3" />}
+            {n.read ? <Lucide.BellOff className="mr-1 h-3 w-3" /> : <Lucide.CheckCheck className="mr-1 h-3 w-3" />}
             {n.read ? "Mark unread" : "Mark read"}
           </Button>
           <Button
@@ -408,7 +414,7 @@ function Row({
             className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
             onClick={() => onRemove(n.id)}
           >
-            <Trash2 className="mr-1 h-3 w-3" /> Dismiss
+            <Lucide.Trash2 className="mr-1 h-3 w-3" /> Dismiss
           </Button>
         </div>
       </div>
@@ -423,7 +429,7 @@ function EmptyState() {
       style={{ boxShadow: "var(--shadow-soft)" }}
     >
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-muted-foreground">
-        <Filter className="h-5 w-5" />
+        <Lucide.Filter className="h-5 w-5" />
       </div>
       <p className="font-serif text-lg font-bold text-foreground">Nothing matches</p>
       <p className="max-w-sm text-sm text-muted-foreground">

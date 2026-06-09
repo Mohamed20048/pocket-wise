@@ -1,3 +1,4 @@
+import { useMemo, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -7,22 +8,123 @@ import { CategoryDonut } from "@/components/finance/CategoryDonut";
 import { TransactionRow } from "@/components/finance/TransactionRow";
 import { CashflowChart } from "@/components/finance/CashflowChart";
 import { Button } from "@/components/ui/button";
-import {
-  Wallet,
-  TrendingUp,
-  TrendingDown,
-  Plus,
-  ShoppingBasket,
-  Coffee,
-  BookOpen,
-  Bus,
-  Music,
-  Briefcase,
-  Search,
-  Bell,
-} from "lucide-react";
+import * as Lucide from "lucide-react";
+import { supabase } from "@/lib/supabase";
+
+const iconMap: Record<string, any> = {
+  ShoppingBasket: Lucide.ShoppingBasket,
+  Coffee: Lucide.Coffee,
+  BookOpen: Lucide.BookOpen,
+  Bus: Lucide.Bus,
+  Music: Lucide.Music,
+  Briefcase: Lucide.Briefcase,
+  Home: Lucide.Home,
+  Utensils: Lucide.Utensils,
+  Gift: Lucide.Gift,
+  Wallet: Lucide.Wallet,
+  Sparkles: Lucide.Sparkles,
+};
 
 const Index = () => {
+  const [profile, setProfile] = useState<any>(null);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [budgets, setBudgets] = useState<any[]>([]);
+  const [featuredGoal, setFeaturedGoal] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadDashboard() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // 1. Fetch Profile
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+      if (prof) setProfile(prof);
+
+      // 2. Fetch Budgets
+      const { data: bgts } = await supabase
+        .from("budgets")
+        .select("*")
+        .eq("user_id", user.id);
+      if (bgts) setBudgets(bgts);
+
+      // 3. Fetch Transactions
+      const { data: txs } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("date", { ascending: false });
+      if (txs) setTransactions(txs);
+
+      // 4. Fetch Featured Goal
+      const { data: goals } = await supabase
+        .from("goals")
+        .select("*")
+        .eq("user_id", user.id);
+      if (goals && goals.length > 0) {
+        const feat = goals.find((g) => g.featured) || goals[0];
+        setFeaturedGoal(feat);
+      }
+
+      setLoading(false);
+    }
+    loadDashboard();
+  }, []);
+
+  const totals = useMemo(() => {
+    const income = transactions.filter((t) => Number(t.amount) > 0).reduce((s, t) => s + Number(t.amount), 0);
+    const expense = transactions.filter((t) => Number(t.amount) < 0).reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
+    const balance = income - expense;
+    return { balance, income, expense };
+  }, [transactions]);
+
+  const recentTxs = useMemo(() => transactions.slice(0, 6), [transactions]);
+
+  const slices = useMemo(() => {
+    const defaultTones: Record<string, string> = {
+      primary: "var(--primary)",
+      warning: "var(--warning)",
+      accent: "var(--accent)",
+      success: "var(--success)",
+      muted: "28 17% 50%",
+    };
+    return budgets.map((b) => ({
+      label: b.name,
+      value: Number(b.spent),
+      color: defaultTones[b.tone] || "var(--primary)",
+    }));
+  }, [budgets]);
+
+  const featuredPct = featuredGoal
+    ? Math.round((Number(featuredGoal.saved) / Number(featuredGoal.target)) * 100)
+    : 0;
+
+  const currentWeekInfo = useMemo(() => {
+    const options: Intl.DateTimeFormatOptions = { month: "long" };
+    const month = new Date().toLocaleDateString("en-US", options);
+    // Simple week calculation
+    const day = new Date().getDate();
+    const week = Math.ceil(day / 7);
+    return `${month} · Week ${week}`;
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center bg-background" style={{ background: "var(--gradient-paper)" }}>
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-secondary">
+            <Lucide.Sprout className="h-7 w-7 text-success animate-pulse" />
+          </div>
+          <p className="font-serif text-lg font-bold text-foreground">Cultivating your dashboard…</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background">
@@ -38,17 +140,13 @@ const Index = () => {
               <span className="text-foreground">Dashboard</span>
             </div>
             <div className="ml-auto flex items-center gap-2">
-              <div className="hidden md:flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground w-64">
-                <Search className="h-3.5 w-3.5" />
-                <span>Search transactions…</span>
-              </div>
               <Button asChild variant="ghost" size="icon" className="text-muted-foreground">
                 <Link to="/notifications" aria-label="Notifications">
-                  <Bell className="h-4 w-4" />
+                  <Lucide.Bell className="h-4 w-4" />
                 </Link>
               </Button>
               <Link to="/profile" aria-label="Open profile" className="h-8 w-8 rounded-full bg-gradient-walnut text-primary-foreground flex items-center justify-center text-xs font-semibold transition hover:ring-2 hover:ring-ring hover:ring-offset-2 hover:ring-offset-background">
-                OS
+                {profile?.display_name?.substring(0, 2).toUpperCase() || "OS"}
               </Link>
             </div>
           </header>
@@ -57,20 +155,19 @@ const Index = () => {
             {/* Page heading */}
             <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">October · Week 4</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{currentWeekInfo}</p>
                 <h1 className="mt-2 font-serif text-4xl font-bold tracking-tight text-foreground md:text-[2.6rem]">
-                  Good morning, Omar.
+                  Good morning, {profile?.display_name || "Omar"}.
                 </h1>
                 <p className="mt-2 max-w-xl text-sm text-muted-foreground">
                   A quiet look at where your money grew this week — and where it drifted away.
                 </p>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" className="border-border bg-card hover:bg-secondary">
-                  Export report
-                </Button>
-                <Button className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-soft">
-                  <Plus className="mr-1.5 h-4 w-4" /> Add transaction
+                <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-soft">
+                  <Link to="/transactions">
+                    <Lucide.Plus className="mr-1.5 h-4 w-4" /> Add transaction
+                  </Link>
                 </Button>
               </div>
             </div>
@@ -79,26 +176,26 @@ const Index = () => {
             <section className="grid gap-4 md:grid-cols-3">
               <StatCard
                 label="Current Balance"
-                value="$1,847.50"
-                delta="+7.2% this month"
-                trend="up"
-                icon={Wallet}
+                value={`$${totals.balance.toFixed(2)}`}
+                delta="Updated in real time"
+                trend={totals.balance >= 0 ? "up" : "down"}
+                icon={Lucide.Wallet}
                 accentClass="bg-primary text-primary-foreground"
               />
               <StatCard
                 label="Income"
-                value="$2,500.00"
-                delta="+$300 vs Sept"
+                value={`$${totals.income.toFixed(2)}`}
+                delta="Total monthly inflow"
                 trend="up"
-                icon={TrendingUp}
+                icon={Lucide.TrendingUp}
                 accentClass="bg-success/15 text-success"
               />
               <StatCard
                 label="Expenses"
-                value="$1,652.50"
-                delta="−4.1% vs Sept"
+                value={`$${totals.expense.toFixed(2)}`}
+                delta="Total monthly outflow"
                 trend="down"
-                icon={TrendingDown}
+                icon={Lucide.TrendingDown}
                 accentClass="bg-warning/20 text-warning"
               />
             </section>
@@ -114,8 +211,10 @@ const Index = () => {
                       <p className="text-xs text-muted-foreground">Income vs. expenses · last 6 months</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs text-muted-foreground">Net this month</p>
-                      <p className="font-serif text-lg font-bold text-success tabular-nums">+$847.50</p>
+                      <p className="text-xs text-muted-foreground">Net flow</p>
+                      <p className={`font-serif text-lg font-bold tabular-nums ${totals.balance >= 0 ? "text-success" : "text-destructive"}`}>
+                        {totals.balance >= 0 ? "+" : "−"}${Math.abs(totals.balance).toFixed(2)}
+                      </p>
                     </div>
                   </div>
                   <CashflowChart />
@@ -124,15 +223,28 @@ const Index = () => {
                 <div className="rounded-xl border border-border bg-card p-6 shadow-soft">
                   <div className="mb-2 flex items-center justify-between">
                     <h2 className="font-serif text-xl font-bold text-foreground">Recent transactions</h2>
-                    <button className="text-xs font-medium text-accent hover:text-foreground">View all →</button>
+                    <Button asChild variant="ghost" size="sm" className="text-xs font-medium text-accent hover:text-foreground">
+                      <Link to="/transactions">View all →</Link>
+                    </Button>
                   </div>
                   <div>
-                    <TransactionRow icon={ShoppingBasket} title="Weekly groceries" category="Food" date="Oct 26" amount={-85.7} />
-                    <TransactionRow icon={Briefcase} title="Freelance payment — Acme" category="Income" date="Oct 25" amount={400} />
-                    <TransactionRow icon={Coffee} title="Morning coffee — Brewbar" category="Cafés" date="Oct 24" amount={-4.5} />
-                    <TransactionRow icon={BookOpen} title="Algorithms textbook" category="Education" date="Oct 23" amount={-32.99} />
-                    <TransactionRow icon={Music} title="Spotify Premium" category="Subscriptions" date="Oct 22" amount={-9.99} />
-                    <TransactionRow icon={Bus} title="Monthly transit pass" category="Transport" date="Oct 21" amount={-45} />
+                    {recentTxs.length === 0 ? (
+                      <div className="py-8 text-center text-xs text-muted-foreground">No recent transactions recorded.</div>
+                    ) : (
+                      recentTxs.map((t) => {
+                        const IconComponent = iconMap[t.icon] || Lucide.Sparkles;
+                        return (
+                          <TransactionRow
+                            key={t.id}
+                            icon={IconComponent}
+                            title={t.title}
+                            category={t.category}
+                            date={new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            amount={Number(t.amount)}
+                          />
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               </div>
@@ -143,40 +255,46 @@ const Index = () => {
                   <h2 className="font-serif text-xl font-bold text-foreground">Budget grove</h2>
                   <p className="mb-5 text-xs text-muted-foreground">How your envelopes are growing</p>
                   <div className="space-y-4">
-                    <BudgetItem label="Groceries" spent={350} total={500} tone="primary" />
-                    <BudgetItem label="Cafés & dining" spent={128} total={150} tone="warning" />
-                    <BudgetItem label="Transport" spent={75} total={120} tone="accent" />
-                    <BudgetItem label="Entertainment" spent={42} total={100} tone="success" />
-                    <BudgetItem label="Education" spent={180} total={300} tone="primary" />
+                    {budgets.length === 0 ? (
+                      <div className="py-8 text-center text-xs text-muted-foreground">No budget envelopes planted yet.</div>
+                    ) : (
+                      budgets.slice(0, 5).map((b) => (
+                        <BudgetItem
+                          key={b.id}
+                          label={b.name}
+                          spent={Number(b.spent)}
+                          total={Number(b.total)}
+                          tone={b.tone}
+                        />
+                      ))
+                    )}
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-border bg-card p-6 shadow-soft">
-                  <h2 className="mb-5 font-serif text-xl font-bold text-foreground">Where it went</h2>
-                  <CategoryDonut
-                    total="$1,652"
-                    slices={[
-                      { label: "Groceries", value: 350, color: "var(--primary)" },
-                      { label: "Cafés", value: 128, color: "var(--warning)" },
-                      { label: "Transport", value: 75, color: "var(--accent)" },
-                      { label: "Entertainment", value: 42, color: "var(--success)" },
-                      { label: "Education", value: 180, color: "28 17% 50%" },
-                    ]}
-                  />
-                </div>
+                {slices.length > 0 && (
+                  <div className="rounded-xl border border-border bg-card p-6 shadow-soft">
+                    <h2 className="mb-5 font-serif text-xl font-bold text-foreground">Where it went</h2>
+                    <CategoryDonut
+                      total={`$${totals.expense.toFixed(0)}`}
+                      slices={slices}
+                    />
+                  </div>
+                )}
 
-                <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-walnut p-6 text-primary-foreground shadow-leaf">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-primary-foreground/70">Savings goal</p>
-                  <h3 className="mt-2 font-serif text-2xl font-bold">Summer trip</h3>
-                  <div className="mt-4 flex items-baseline gap-2">
-                    <span className="font-serif text-3xl font-bold tabular-nums">$640</span>
-                    <span className="text-sm text-primary-foreground/70">/ $1,200</span>
+                {featuredGoal && (
+                  <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-walnut p-6 text-primary-foreground shadow-leaf">
+                    <p className="text-[11px] uppercase tracking-[0.2em] text-primary-foreground/70">Savings goal</p>
+                    <h3 className="mt-2 font-serif text-2xl font-bold">{featuredGoal.name}</h3>
+                    <div className="mt-4 flex items-baseline gap-2">
+                      <span className="font-serif text-3xl font-bold tabular-nums">${Number(featuredGoal.saved).toLocaleString()}</span>
+                      <span className="text-sm text-primary-foreground/70">/ ${Number(featuredGoal.target).toLocaleString()}</span>
+                    </div>
+                    <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-primary-foreground/15">
+                      <div className="h-full rounded-full bg-primary-foreground/80" style={{ width: `${featuredPct}%` }} />
+                    </div>
+                    <p className="mt-3 text-xs text-primary-foreground/70">{featuredPct}% planted · blooms soon</p>
                   </div>
-                  <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-primary-foreground/15">
-                    <div className="h-full rounded-full bg-primary-foreground/80" style={{ width: "53%" }} />
-                  </div>
-                  <p className="mt-3 text-xs text-primary-foreground/70">53% planted · 8 weeks to bloom</p>
-                </div>
+                )}
               </div>
             </section>
 
