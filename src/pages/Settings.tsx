@@ -10,7 +10,6 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
-import { Sprout } from "lucide-react";
 import {
   Bell,
   Search,
